@@ -1,0 +1,37 @@
+name: Release
+
+on: workflow_call
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - id: changelog
+        uses: TriPSs/conventional-changelog-action@v3
+        with:
+          git-user-name: github-actions[bot]
+          git-user-email: 41898282+github-actions[bot]@users.noreply.github.com
+          github-token: ${{ github.token }}
+          skip-version-file: true
+      - name: Push tags
+        if: ${{ steps.changelog.outputs.tag }}
+        run: |
+          version='${{ steps.changelog.outputs.tag }}'
+          for tag in ${version%.*.*} ${version%.*} latest; do
+            git tag --force ${tag}
+            git push --force origin ${tag}
+          done
+      - uses: ncipollo/release-action@v1
+        if: ${{ steps.changelog.outputs.tag }}
+        with:
+          body: |
+            ${{ steps.changelog.outputs.clean_changelog }}
+          tag: ${{ steps.changelog.outputs.tag }}
+      - name: Annotate release
+        if: ${{ steps.changelog.outputs.tag }}
+        run: echo '::notice title=Release Published::${{ steps.changelog.outputs.tag }}'
+      - name: Annotate no release
+        if: ${{ ! steps.changelog.outputs.tag }}
+        run: echo '::notice title=No Release::No version bump.'
